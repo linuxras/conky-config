@@ -8,16 +8,25 @@ topprocesses = ''
 cpus = -1
 ncpu = 0
 cpu_temp_file = ''
+wifi_temp_file = ''
+nvme_temp_file = ''
+igpu_temp_file = ''
 active_network_interface = false
 fan = -1
 fan_files = {}
 fan_rpms = {}
 ctemp = 0
+wifi_temp = 0
+nvme_temp = 0
+igpu_temp = 0
 start_flag = 1
 cpu_min_freq = {}
 cpu_max_freq = {}
 
 cpu_temp_update_freq = 4
+wifi_temp_update_freq = 4
+nvme_temp_update_freq = 4
+igpu_temp_update_freq = 4
 
 -- Configs
 ENABLE_COLORS = true
@@ -87,7 +96,7 @@ end
 -- Draws max n mounted partitions and its stats
 function conky_mountmedia(n)
     if tonumber(conky_parse("$updates")) % 4 == 0 then
-        local file = io.popen('lsblk | grep -oE ".*sd.* part /.*" | grep -oE "(/.*)"')
+        local file = io.popen('lsblk | grep -oE ".*(sd|nvme0n1).* part /.*" | grep -oE "(/.*)"')
         local count = 1
         local media = ''
         for line in file:lines() do
@@ -179,7 +188,7 @@ function conky_cputemp()
             local all_hwmon_temp_names = io.popen('ls /sys/class/hwmon/*/temp* | grep -Po --regexp ".*(label)$"')
             for l in all_hwmon_temp_names:lines() do
                 local name = io.popen('cat ' .. l):read("*a")
-                if name:match("^Package*") then
+                if name:match("^Tdie*") then
                     cpu_temp_file = l:gsub("label", "input")
                     break
                 end
@@ -199,6 +208,96 @@ function conky_cputemp()
         cpu_temp_update_freq = 6
     end
     return "${font FontAwesome} ${font}" .. ctemp
+end
+
+-- Returns WiFi temperature in Celsius
+function conky_wifitemp()
+    if tonumber(conky_parse("$updates")) % wifi_temp_update_freq == 0 or wifi_temp == 0 then
+        -- Get find cpu temp file on first call
+        if wifi_temp == 0 then
+            local all_hwmon_temp_names = io.popen('ls /sys/class/hwmon/*/name')
+            for l in all_hwmon_temp_names:lines() do
+                local name = io.popen('cat ' .. l):read("*a")
+                if name:match("^iwlwifi_1*") then
+                    wifi_temp_file = l:gsub("name", "temp1_input")
+                    break
+                end
+            end
+            all_hwmon_temp_names:close()
+        end
+        local wifi_temp_file_handle = io.open(wifi_temp_file, "r")
+        wifi_temp = tonumber(wifi_temp_file_handle:read("*a"))  / 1000
+        wifi_temp_file_handle:close()
+    end
+    if wifi_temp > 75 then
+        wifi_temp_update_freq = 2
+        return "${color #ff0000}${font FontAwesome} ${font}${blink " .. wifi_temp .. "}${color}"
+    elseif wifi_temp > 50 then
+        wifi_temp_update_freq = 4
+    else
+        wifi_temp_update_freq = 6
+    end
+    return "${font FontAwesome} ${font}" .. wifi_temp
+end
+
+-- Returns NVME temperature in Celsius
+function conky_nvmetemp()
+    if tonumber(conky_parse("$updates")) % nvme_temp_update_freq == 0 or nvme_temp == 0 then
+        -- Get find cpu temp file on first call
+        if nvme_temp == 0 then
+            local all_hwmon_temp_names = io.popen('ls /sys/class/hwmon/*/temp* | grep -Po --regexp ".*(label)$"')
+            for l in all_hwmon_temp_names:lines() do
+                local name = io.popen('cat ' .. l):read("*a")
+                if name:match("^Composite*") then
+                    nvme_temp_file = l:gsub("label", "input")
+                    break
+                end
+            end
+            all_hwmon_temp_names:close()
+        end
+        local nvme_temp_file_handle = io.open(nvme_temp_file, "r")
+        nvme_temp = tonumber(nvme_temp_file_handle:read("*a"))  / 1000
+        nvme_temp_file_handle:close()
+    end
+    if nvme_temp > 75 then
+        nvme_temp_update_freq = 2
+        return "${color #ff0000}${font FontAwesome} ${font}${blink " .. nvme_temp .. "}${color}"
+    elseif nvme_temp > 50 then
+        nvme_temp_update_freq = 4
+    else
+        nvme_temp_update_freq = 6
+    end
+    return "${font FontAwesome} ${font}" .. nvme_temp
+end
+
+-- Returns iGPU temperature in Celsius
+function conky_igputemp()
+    if tonumber(conky_parse("$updates")) % igpu_temp_update_freq == 0 or igpu_temp == 0 then
+        -- Get find cpu temp file on first call
+        if igpu_temp == 0 then
+            local all_hwmon_temp_names = io.popen('ls /sys/class/hwmon/*/temp* | grep -Po --regexp ".*(label)$"')
+            for l in all_hwmon_temp_names:lines() do
+                local name = io.popen('cat ' .. l):read("*a")
+                if name:match("^edge*") then
+                    igpu_temp_file = l:gsub("label", "input")
+                    break
+                end
+            end
+            all_hwmon_temp_names:close()
+        end
+        local igpu_temp_file_handle = io.open(igpu_temp_file, "r")
+        igpu_temp = tonumber(igpu_temp_file_handle:read("*a"))  / 1000
+        igpu_temp_file_handle:close()
+    end
+    if igpu_temp > 75 then
+        igpu_temp_update_freq = 2
+        return "${color #ff0000}${font FontAwesome} ${font}${blink " .. igpu_temp .. "}${color}"
+    elseif igpu_temp > 50 then
+        igpu_temp_update_freq = 4
+    else
+        igpu_temp_update_freq = 6
+    end
+    return "${font FontAwesome} ${font}" .. igpu_temp
 end
 
 -- Returns Nth fan's speed in RPM
