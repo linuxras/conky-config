@@ -179,7 +179,7 @@ function conky_cputemp()
             local all_hwmon_temp_names = io.popen('ls /sys/class/hwmon/*/temp* | grep -Po --regexp ".*(label)$"')
             for l in all_hwmon_temp_names:lines() do
                 local name = io.popen('cat ' .. l):read("*a")
-                if name:match("^Package*") then
+                if name:match("^CPU*") then
                     cpu_temp_file = l:gsub("label", "input")
                     break
                 end
